@@ -7,24 +7,31 @@ import Valkey from "iovalkey"
 
 configDotenv();
 
-const cache = new Valkey();
+const cache = new Valkey(6379, "valkey", {});
 
 export const GetAllUsers = async (req, res) => {
 
     try{
         let users = await cache.get("users");
         users = JSON.parse(users);
-        if (user) {
+        if (users) {
             return res.status(200).json({
                 data: users,
             });
         }
+
+        users = await Users.findAll();
+        await cache.set("users",JSON.stringify(users), "EX",10);
+
+        return res.status(200).json({
+            data: users,
+        });
         
     } catch (error) {
         console.log(error)
         return res
         .status(503)
-        .json({data: "No se pudo obtener los Usuarios"})
+        .json({data: "No se pudo obtener los Usuarios"});
     }
     
 };
@@ -41,14 +48,14 @@ try{
 
     const hashedPasword = await bcrypt.hash(password, 10);
 
-    await Users.create({ email, password, hashedPasword, name});
+    await Users.create({ email, password: hashedPasword, name});
 
     return res.status(201).json({ data: "Usuario creado con Exito" });    
 } catch (error) {
 console.log(error);
 return res.status(503).json({
     data: "No se pudo crear"
-})
+});
 }
 
 };
@@ -98,7 +105,7 @@ export const Login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const user = await Users.findOne({ where: {email: email}});
+        const user = await Users.findOne({ where: {email: email} });
    
         if (!user) {
             return res.status(404).json({ data: "Usuario no encontrado" });
@@ -112,11 +119,11 @@ export const Login = async (req, res) => {
 
         const userId = user.id;
 
-        const token = jwt.sign({userId}, process.env.SECRET, {
-            expireIn: "1h",
+        const token = jwt.sign({ userId }, process.env.SECRET, {
+            expiresIn: "1h",
         });
 
-        return res.status(200).json({data: {token}});
+        return res.status(200).json({data: {token} });
 
 
     } catch (error) {
